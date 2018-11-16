@@ -1,2 +1,9 @@
-*.class
-*.log
+**/tmp
+**/old
+
+# Java / Scala
+**/*.class
+**/*.log
+
+# Sbt
+**/target
