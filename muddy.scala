@@ -19,35 +19,41 @@ object html {
 
 	def header(length: Int): String = //standardized header of reply to client
 	  s"HTTP/1.0 200 OK\nContent-length: $length\nContent-type: text/html\n\n"
+
+  def errorResponse(uri:String) = html.page("FATTAR NOLL: " + uri)
+
 }
 
 object Muddy {
   var version = "0.0.1"
 
-  def errorResponse(uri:String) = html.page("FATTAR NOLL: " + uri)
+  val db = new java.util.concurrent.ConcurrentHashMap[String,String]
 
-  def form(id: Int): String = s"""
+  def form(value: String = ""): String = s"""
   <form action="" method="get">
     <div>
       <label for="mud">Muddiest point?</label>
-      <input name="mud" id="mud" value="">
+      <input name="mud" id="mud" value="$value">
       <button>Vote</button>
     </div>
   </form>
   """
 
-  def login(group: String, id: Int): String = s"""
-  <form action="$group/session=$id" method="post">
+  def login(group: String, id: String): String = s"""
+  <form action="session=$id" method="post">
     <div>
       <button type="submit">Login</button>
     </div>
   </form>
   """
 
+  def setVote(id: String, value: String): Unit = if (value.nonEmpty) db.put(id, value)
 
+  def getVote(id: String): String = Option(db.get(id)).getOrElse("")
 
-  private var _id = 1000
-  def nextId(): Int = { _id += 1 ; _id }
+  def showDatabase(): String = db.toString
+
+  def nextId(): String = java.util.UUID.randomUUID.toString
 
   def handleRequest(cmd: String, uri: String, socket: Socket): Unit = {
     val os = socket.getOutputStream
@@ -55,13 +61,20 @@ object Muddy {
     val parts = uri.split('/').drop(1).toVector // skip initial slash
     println(s"parts=$parts" )
     val response: String = (parts.head, parts.tail) match {
-      case ("muddy", Seq(group, info)) if info.startsWith("session") =>
-        html.page("Session: " + uri + " " + form(42) + "<br>" + group + "/" + info + "<br>" + socket.getInetAddress())
+
+      case ("muddy", Seq(group, info)) if info.startsWith("session=") =>
+        val id = info.stripPrefix("session=").takeWhile(_ != '?')
+        val vote = info.dropWhile(_ != '?').stripPrefix("?mud=")
+        println(s"\n*** vote = $vote")
+        setVote(id, vote)
+        val result = html.page("Session: " + uri + " " + form("hejsan") + "<br>" + group + "/" + info + "<br>" + socket.getInetAddress()) + "<br>" + showDatabase
+        result
 
       case ("muddy",Seq(group)) =>
         val sessionId = nextId()
         html.page(s"Welcome to Muddy! Your session id is $sessionId in $group at $uri \n ${login(group, sessionId)}")
-      case _ => errorResponse(uri)
+
+      case _ => html.errorResponse(uri)
     }
     os.write(html.header(response.size).getBytes("UTF-8"))
     os.write(response.getBytes("UTF-8"))
