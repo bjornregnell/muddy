@@ -21,7 +21,7 @@ object Html {
 	  s"HTTP/1.0 200 OK\nContent-length: $length\nContent-type: text/html\n\n"
 
   def errorResponse(uri:String, msg: String) =
-    Html.page(s"FATTAR NOLL: $msg <br> $uri")
+    Html.page(s"FATTAR NOLL: $uri <br> $msg")
 
 }
 
