@@ -75,11 +75,11 @@ object Muddy {
 
   def showCounts(topic: String): String =
     db.asScala.filterKeys(_.topic == topic)
-      .values.collect{ case Value(s) if s.nonEmpty => s }
+      .values.collect { case Value(s) if s.nonEmpty => s }
       .groupBy(x => x)
-      .collect{ case (v,xs) => (v, xs.size) }.toSeq
+      .collect { case (v,xs) => (v, xs.size) }.toSeq
       .sortBy(_._2).reverse
-      .map{case (v, n) => s" $v = $n "}.mkString("<br>")
+      .map { case (v, n) => s" $v = $n " }.mkString("<br>")
 
   def showDatabase(): String = db.toString
 
