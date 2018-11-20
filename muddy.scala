@@ -143,5 +143,5 @@ object Muddy {
 			  }.recover{ case e: Throwable => s"ERROR: Connection failed due to exception: $e" }
 			}
 	  }
-	}
+	} else throw new Exception(s"Server already started at $port")
 }
