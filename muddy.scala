@@ -97,8 +97,14 @@ object Muddy {
 
       case ("muddy", Seq(topic, info)) if info.startsWith("session=") =>
         val id = info.stripPrefix("session=").takeWhile(_ != '?')
-        val vote = Url.decode(info.dropWhile(_ != '?').stripPrefix("?").stripPrefix("mud="))
-        println(s"\n*** setVote($id, $topic,$vote)\n")
+        val vote = Url.decode(
+					info.dropWhile(_ != '?')
+					  .stripPrefix("?")
+						.stripPrefix("mud=")
+						.trim
+						.toLowerCase
+				)
+        println(s"\n*** setVote($id,$topic,$vote)\n")
         setVote(id = id, topic = topic, value = vote)
         val result = Html.page("Your ip address: " + socket.getInetAddress() + "<br>" + votingForm(vote) + "<br>"  +
           showCounts(topic) + "<br> <br> <br>"
