@@ -8,14 +8,18 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 
 object Html {
-	def page(body: String): String =  //minimal web page
+	def page(body: String): String =  {
+		//minimal web page, the link tag prevents GET /favicon.ico
     s"""<!DOCTYPE html>
-       |<html><head><meta charset="UTF-8"><title>Muddy Sörvor</title></head>
+       |<html><head><meta charset="UTF-8"><title>Muddy Sörvor</title>
+			 |<link rel="icon" href="data:,">
+			 |</head>
        |<body>
        |$body
        |</body>
        |</html>
        """.stripMargin
+	}
 
 	def header(length: Int): String = //standardized header of reply to client
 	  s"HTTP/1.0 200 OK\nContent-length: $length\nContent-type: text/html\n\n"
@@ -87,15 +91,14 @@ object Muddy {
 
   def handleRequest(cmd: String, uri: String, socket: Socket): Unit = {
     val os = socket.getOutputStream
-    println(s"\n\nHANDLE REQUEST: $cmd $uri $socket")
     val parts = uri.split('/').drop(1).toVector // skip initial slash
-    println(s"parts=$parts" )
+    println(s"HANDLE REQUEST: $parts" )
     val response: String = (parts.head, parts.tail) match {
 
       case ("muddy", Seq(topic, info)) if info.startsWith("session=") =>
         val id = info.stripPrefix("session=").takeWhile(_ != '?')
         val vote = Url.decode(info.dropWhile(_ != '?').stripPrefix("?").stripPrefix("mud="))
-        println(s"\n*** vote = $vote")
+        println(s"\n*** setVote($id, $topic,$vote)\n")
         setVote(id = id, topic = topic, value = vote)
         val result = Html.page("Your ip address: " + socket.getInetAddress() + "<br>" + votingForm(vote) + "<br>"  +
           showCounts(topic) + "<br> <br> <br>"
@@ -107,6 +110,7 @@ object Muddy {
 
       case _ => Html.errorResponse(uri, "sidan är vojd :( ")
     }
+		println(s"RESPONSE:\n$response")
     os.write(Html.header(response.size).getBytes("UTF-8"))
     os.write(response.getBytes("UTF-8"))
     os.close
@@ -122,7 +126,12 @@ object Muddy {
   		  var socket = server.accept  // blocks thread until connect
 	  	  val scan = new Scanner(socket.getInputStream, "UTF-8")
 		    val (cmd, uri) = (scan.next, scan.next)
-			  println(s"Request: $cmd $uri from SOCKET: $socket at RemoteSocketAddress = ${socket.getRemoteSocketAddress()} at InetAddress=${socket.getInetAddress()}")
+			  println(s"""
+					|REQUEST:
+					|  $cmd $uri
+					|  FROM: ${socket.getInetAddress()}
+					|  PORT: ${socket.getPort()}
+				""".stripMargin)
 		    Future { handleRequest(cmd, uri, socket) }.onComplete {
 		      case Failure(e) => println(s"ERROR: in method handleRequest; reqest failed: $e")
           case Success(_) => println(s"\n___Request complete.\n")
