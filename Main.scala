@@ -1,8 +1,5 @@
 package muddy
 
-import scala.concurrent._
-import ExecutionContext.Implicits.global
-
 object Main {
   def helpMsg: String = s"""
 	|  Commands:
@@ -16,7 +13,7 @@ object Main {
 
 	def main(args: Array[String]) {
 	  val port = scala.util.Try(args(0).toInt).getOrElse(8089)
-    Future { Muddy.serverLoop(port) }
+    Muddy.start(port)
 		var quit = false
     while (!quit) {
 			val reply = getCmd() match {

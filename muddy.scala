@@ -117,26 +117,31 @@ object Muddy {
     socket.close
   }
 
-  def serverLoop(port: Int): Unit = {
-    println(s"\nStarting Muddy server version $version on port $port...")
-    val server= new ServerSocket(port)
-    println(s"Server running at: http://localhost:${server.getLocalPort}/muddy")
-		while (true) {
-  		Try {
-  		  var socket = server.accept  // blocks thread until connect
-	  	  val scan = new Scanner(socket.getInputStream, "UTF-8")
-		    val (cmd, uri) = (scan.next, scan.next)
-			  println(s"""
-					|REQUEST:
-					|  $cmd $uri
-					|  FROM: ${socket.getInetAddress()}
-					|  PORT: ${socket.getPort()}
-				""".stripMargin)
-		    Future { handleRequest(cmd, uri, socket) }.onComplete {
-		      case Failure(e) => println(s"ERROR: in method handleRequest; reqest failed: $e")
-          case Success(_) => println(s"\n___Request complete.\n")
-		    }
-		  }.recover{ case e: Throwable => s"ERROR: Connection failed due to exception: $e" }
-		}
-  }
+  private var isStarted = false
+
+  def start(port: Int): Unit = if (!isStarted) {
+		isStarted = true
+		Future {
+	    println(s"\nStarting Muddy server version $version on port $port...")
+	    val server= new ServerSocket(port)
+	    println(s"Server running at: http://localhost:${server.getLocalPort}/muddy")
+			while (true) {
+	  		Try {
+	  		  var socket = server.accept  // blocks thread until connect
+		  	  val scan = new Scanner(socket.getInputStream, "UTF-8")
+			    val (cmd, uri) = (scan.next, scan.next)
+				  println(s"""
+						|REQUEST:
+						|  $cmd $uri
+						|  FROM: ${socket.getInetAddress()}
+						|  PORT: ${socket.getPort()}
+					""".stripMargin)
+			    Future { handleRequest(cmd, uri, socket) }.onComplete {
+			      case Failure(e) => println(s"ERROR: in method handleRequest; reqest failed: $e")
+	          case Success(_) => println(s"\n___Request complete.\n")
+			    }
+			  }.recover{ case e: Throwable => s"ERROR: Connection failed due to exception: $e" }
+			}
+	  }
+	}
 }
