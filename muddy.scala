@@ -30,7 +30,7 @@ object Url {
 }
 
 object Muddy {
-  var version = "0.0.1"
+  var version = "0.0.2"
 
 
   def loginForm(topic: String, id: String): String = s"""
@@ -124,10 +124,10 @@ object Muddy {
 		    val (cmd, uri) = (scan.next, scan.next)
 			  println(s"Request: $cmd $uri from SOCKET: $socket at RemoteSocketAddress = ${socket.getRemoteSocketAddress()} at InetAddress=${socket.getInetAddress()}")
 		    Future { handleRequest(cmd, uri, socket) }.onComplete {
-		      case Failure(e) => println(s"Reqest failed: $e")
+		      case Failure(e) => println(s"ERROR: in method handleRequest; reqest failed: $e")
           case Success(_) => println(s"\n___Request complete.\n")
 		    }
-		  }.recover{ case e: Throwable => s"Connection failed: $e" }
+		  }.recover{ case e: Throwable => s"ERROR: Connection failed due to exception: $e" }
 		}
   }
 }
