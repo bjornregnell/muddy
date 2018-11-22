@@ -8,11 +8,36 @@ import scala.concurrent._
 import ExecutionContext.Implicits.global
 
 object Html {
+  def faviconData = """image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACBAAAeaR9cIAAAAASUVORK5CYII="""
+
+  def faviconMini = "image/x-icon;,"
+
+  def favicon = """<link href="data:$faviconMini" rel="icon" type="image/x-icon" />"""
+
 	def page(body: String): String =  {
 		//minimal web page, the link tag prevents GET /favicon.ico
     s"""<!DOCTYPE html>
        |<html><head><meta charset="UTF-8"><title>Muddy Sörvor</title>
-			 |<link rel="icon" href="data:,">
+       |$favicon
+       |<style>
+       |body {
+       |    background-color: pink;
+       |    font-size:5vw;
+       |    font-family: "Lucida Console", Monaco, monospace;
+       |}
+       |.button {
+       |      background-color: #4CAF50;
+       |      border: none;
+       |      color: white;
+       |      padding: 15px 32px;
+       |      text-align: center;
+       |      text-decoration: none;
+       |      display: inline-block;
+       |      font-size: 5vw;
+       |      margin: 1px 1px;
+       |      cursor: pointer;
+       |}
+       |</style>
 			 |</head>
        |<body>
        |$body
@@ -33,14 +58,21 @@ object Url {
   def decode(url: String): String = java.net.URLDecoder.decode(url, "UTF-8")
 }
 
-object Muddy {
-  var version = "0.0.2"
+object Concurrently {
+  def apply(code: => Unit): Unit = new Thread{
+    override def run(): Unit = code
+  }.start
+}
 
+object Muddy {
+  var version = "0.0.3"
+
+  def log(msg: String): Unit = println(msg)
 
   def loginForm(topic: String, id: String): String = s"""
   <form action="/muddy/$topic/session=$id" method="get">
     <div>
-      <button type="submit">Login</button>
+      <button class="button" type="submit">Login</button>
     </div>
   </form>
   """
@@ -56,11 +88,10 @@ object Muddy {
     <div>
       <label for="mud">Your vote: </label>
       <input name="mud" id="mud" value="$value">
-      <button>Update</button>
+      <button class="button">Update</button>
     </div>
   </form>
   """
-
 
   case class Key(id: String, topic: String)
   case class Value(value: String)
@@ -89,65 +120,129 @@ object Muddy {
 
   def nextId(): String = java.util.UUID.randomUUID.toString
 
-  def handleRequest(cmd: String, uri: String, socket: Socket): Unit = {
-    val os = socket.getOutputStream
-    val parts = uri.split('/').drop(1).toVector // skip initial slash
-    println(s"HANDLE REQUEST: $parts" )
-    val response: String = (parts.head, parts.tail) match {
+  def response(cmd: Try[String], url: Try[String], inetAdress: String): String = {
+    (cmd, url) match {
+      case (Success("GET"), Success("/favicon.ico")) =>
+        Html.faviconMini
 
-      case ("muddy", Seq(topic, info)) if info.startsWith("session=") =>
-        val id = info.stripPrefix("session=").takeWhile(_ != '?')
-        val vote = Url.decode(
-					info.dropWhile(_ != '?')
-					  .stripPrefix("?")
-						.stripPrefix("mud=")
-						.trim
-						.toLowerCase
-				)
-        println(s"\n*** setVote($id,$topic,$vote)\n")
-        setVote(id = id, topic = topic, value = vote)
-        val result = Html.page("Your ip address: " + socket.getInetAddress() + "<br>" + votingForm(vote) + "<br>"  +
-          showCounts(topic) + "<br> <br> <br>"
-          + showDatabase
-        )
-        result
+      case (Success("GET"), Success("/hej")) =>
+        val page = Html.page("Hejhej")
+        Html.header(page.size) + page
 
-      case ("muddy", Seq(topic)) => loginPage(sessionId = nextId(), topic)
+      case (Success("GET"), Success(s)) if s.startsWith("/muddy") =>
+        val parts = s.stripPrefix("/muddy").split('/').toSeq.filter(_.nonEmpty)
+        println(s"MUDDY: $parts")
+        val page = parts match {
+          case Seq(topic, info) if info.startsWith("session=") =>
+            val id = info.stripPrefix("session=").takeWhile(_ != '?')
+            val vote = Url.decode(
+              info.dropWhile(_ != '?')
+                .stripPrefix("?")
+                .stripPrefix("mud=")
+                .trim
+                .toLowerCase
+            )
+            log(s"\n*** setVote($id,$topic,$vote)\n")
+            setVote(id = id, topic = topic, value = vote)
+            val result = Html.page(
+              "Your ip address: " + inetAdress + "<br>" +
+              votingForm(vote) + "<br>"  +
+              showCounts(topic) + "<br> <br> <br>" +
+              showDatabase
+            )
+            result
 
-      case _ => Html.errorResponse(uri, "sidan är vojd :( ")
+          case Seq(topic) => loginPage(sessionId = nextId(), topic)
+          case _ => Html.page(s"MUDDY: $parts")
+        }
+        Html.header(page.size) + page
+
+      case (Success("GET"), what ) =>
+        val page = Html.errorResponse(what.toString, "sidan är vojd :( ")
+        Html.header(page.size) + page
+
+      case _ => " "
     }
-		println(s"RESPONSE:\n$response")
-    os.write(Html.header(response.size).getBytes("UTF-8"))
-    os.write(response.getBytes("UTF-8"))
-    os.close
-    socket.close
+
+    // parts match {
+    //   case Seq(_, "muddy", topic, info) if info.startsWith("session=") =>
+    //     val id = info.stripPrefix("session=").takeWhile(_ != '?')
+    //     val vote = Url.decode(
+    //       info.dropWhile(_ != '?')
+    //         .stripPrefix("?")
+    //         .stripPrefix("mud=")
+    //         .trim
+    //         .toLowerCase
+    //     )
+    //     log(s"\n*** setVote($id,$topic,$vote)\n")
+    //     setVote(id = id, topic = topic, value = vote)
+    //     val result = Html.page(
+    //       "Your ip address: " + inetAdress + "<br>" +
+    //       votingForm(vote) + "<br>"  +
+    //       showCounts(topic) + "<br> <br> <br>" +
+    //       showDatabase
+    //     )
+    //     result
+    //
+    //   case Seq(_, "muddy", topic) => loginPage(sessionId = nextId(), topic)
+    //
+    //   case _ => Html.errorResponse(uriOpt.getOrElse(""), "sidan är vojd :( ")
+    // }
   }
 
-  private var isStarted = false
+  var n = 0
 
-  def start(port: Int): Unit = if (!isStarted) {
-		isStarted = true
-		Future {
-	    println(s"\nStarting Muddy server version $version on port $port...")
-	    val server= new ServerSocket(port)
-	    println(s"Server running at: http://localhost:${server.getLocalPort}/muddy")
-			while (true) {
-	  		Try {
-	  		  var socket = server.accept  // blocks thread until connect
-		  	  val scan = new Scanner(socket.getInputStream, "UTF-8")
-			    val (cmd, uri) = (scan.next, scan.next)
-				  println(s"""
-						|REQUEST:
-						|  $cmd $uri
-						|  FROM: ${socket.getInetAddress()}
-						|  PORT: ${socket.getPort()}
-					""".stripMargin)
-			    Future { handleRequest(cmd, uri, socket) }.onComplete {
-			      case Failure(e) => println(s"ERROR: in method handleRequest; reqest failed: $e")
-	          case Success(_) => println(s"\n___Request complete.\n")
-			    }
-			  }.recover{ case e: Throwable => s"ERROR: Connection failed due to exception: $e" }
-			}
-	  }
-	} else throw new Exception(s"Server already started at $port")
+  def handleRequest(clientSocket: Socket): Unit = {
+    n += 1
+    println(s"${n}th $clientSocket")
+    var os: OutputStream = null
+    try {
+      val is = clientSocket.getInputStream
+      log("waiting for data on input stream")
+      val scan = new Scanner(is, "UTF-8")
+      val cmd = Try(scan.next)
+      val url = Try(scan.next)
+      log(s"""
+        |---INPUT BEGIN:
+        | cmd = $cmd
+        | url = $url
+        |---INPUT END.
+      """.stripMargin)
+      val output: String = response(cmd, url, clientSocket.getInetAddress.toString)
+  		log(s"SENDING RESPONSE:\n$output")
+      os = clientSocket.getOutputStream
+      os.write(output.getBytes("UTF-8"))
+    // } catch { case e: Throwable =>
+    //     log(s"ERROR: handleRequest failed due to exception: $e")
+    } finally {
+      if (os != null) os.close
+      if (clientSocket != null) clientSocket.close
+    }
+  }
+
+  def start(port: Int): Unit = Concurrently {
+    log(s"\nStarting Muddy server version $version on port $port...")
+    val serverSocket = new ServerSocket(port)
+    log(s"Server running at: http://localhost:${serverSocket.getLocalPort}")
+		while (true) {
+      var clientSocket: Socket = null
+  		try {
+        log("*** Waiting for connection...")
+        clientSocket = serverSocket.accept  // blocks this thread until connect
+        log(s"""
+          |REQUEST:
+          |  FROM: ${clientSocket.getInetAddress()}
+          |  PORT: ${clientSocket.getPort()}
+        """.stripMargin)
+
+		    Concurrently {
+          handleRequest(clientSocket)
+          log(s"\n___Request complete.\n")
+        }
+  	  } catch { case e: Throwable =>
+          log(s"*********** ERROR: Connection failed due to exception: $e")
+      }
+		}
+  }
+
 }
