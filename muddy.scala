@@ -4,8 +4,8 @@ import java.net.{ServerSocket, Socket}
 import java.io.OutputStream
 import java.util.Scanner
 import scala.util.{Try, Success, Failure}
-import scala.concurrent._
-import ExecutionContext.Implicits.global
+// import scala.concurrent._
+// import ExecutionContext.Implicits.global
 
 object Html {
   def faviconData = """image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACBAAAeaR9cIAAAAASUVORK5CYII="""
@@ -17,25 +17,30 @@ object Html {
 	def page(body: String): String =  {
 		//minimal web page, the link tag prevents GET /favicon.ico
     s"""<!DOCTYPE html>
-       |<html><head><meta charset="UTF-8"><title>Muddy Sörvor</title>
+       |<html><head><meta charset="UTF-8"><title>MUDDY VOTING SÖRVER</title>
        |$favicon
        |<style>
        |body {
        |    background-color: pink;
-       |    font-size:5vw;
+       |    font-size:3vw;
        |    font-family: "Lucida Console", Monaco, monospace;
        |}
        |.button {
        |      background-color: #4CAF50;
        |      border: none;
-       |      color: white;
-       |      padding: 15px 32px;
+       |      color: pink;
+       |      padding: 3vw 2vw;
        |      text-align: center;
        |      text-decoration: none;
        |      display: inline-block;
        |      font-size: 5vw;
-       |      margin: 1px 1px;
+       |      margin: 1vw 1vw;
        |      cursor: pointer;
+       |}
+       |.inpluttadej {
+       |      width: 25%;
+       |      font-size: 5vw;
+       |      margin: 1px 1px;
        |}
        |</style>
 			 |</head>
@@ -65,7 +70,7 @@ object Concurrently {
 }
 
 object Muddy {
-  var version = "0.0.3"
+  var version = "0.0.4"
 
   def log(msg: String): Unit = println(msg)
 
@@ -79,15 +84,19 @@ object Muddy {
 
   def loginPage(sessionId: String, topic: String): String =
     Html.page(s"""
-      Welcome to Muddy! Press button to start voting on $topic! <br>
+      Welcome to Muddy Voting Sörver! <br><br>
+      Press Login to start voting on $topic...<br><br>
       ${loginForm(topic, sessionId)}
     """)
 
+  val MaxLetters = 20
+
   def votingForm(value: String = ""): String = s"""
   <form action="" method="get">
+    (type only letters or - or space, max $MaxLetters chars)
     <div>
       <label for="mud">Your vote: </label>
-      <input name="mud" id="mud" value="$value">
+      <input name="mud" id="mud" value="$value" class="inpluttadej">
       <button class="button">Update</button>
     </div>
   </form>
@@ -108,13 +117,18 @@ object Muddy {
   def getVote(id: String, topic: String): String =
     Option(db.get(Key(id, topic))).map(_.value).getOrElse("")
 
-  def showCounts(topic: String): String =
-    db.asScala.filterKeys(_.topic == topic)
+  def showCounts(topic: String): String = {
+    val register = db.asScala.filterKeys(_.topic == topic)
       .values.collect { case Value(s) if s.nonEmpty => s }
       .groupBy(x => x)
-      .collect { case (v,xs) => (v, xs.size) }.toSeq
+      .collect { case (v, xs) => (v, xs.size) }.toSeq
       .sortBy(_._2).reverse
-      .map { case (v, n) => s" $v = $n " }.mkString("<br>")
+    val n = register.map(_._2).sum
+    val max = register.maxBy(_._2)._2
+    val winners = register.filter(_._2 == max).map(_._1).mkString(", ")
+    s"TOT=$n. MAX=$max: $winners.<br>" +
+      register.map { case (v, n) => s"$v($n)" }.mkString(", ")
+  }
 
   def showDatabase(): String = db.toString
 
@@ -135,20 +149,22 @@ object Muddy {
         val page = parts match {
           case Seq(topic, info) if info.startsWith("session=") =>
             val id = info.stripPrefix("session=").takeWhile(_ != '?')
-            val vote = Url.decode(
-              info.dropWhile(_ != '?')
-                .stripPrefix("?")
-                .stripPrefix("mud=")
-                .trim
-                .toLowerCase
-            )
+            val vote = Url.decode(info)
+              .dropWhile(_ != '?')
+              .stripPrefix("?")
+              .stripPrefix("mud=")
+              .toLowerCase(java.util.Locale.getDefault)
+              .map(ch => if (ch == '-' | ch.isLetter) ch else ' ')
+              .trim.replaceAll(" +", " ")  //only a single space
+              .take(MaxLetters)
             log(s"\n*** setVote($id,$topic,$vote)\n")
             setVote(id = id, topic = topic, value = vote)
             val result = Html.page(
-              "Your ip address: " + inetAdress + "<br>" +
+              s"""Welcome dear human proxy on ${inetAdress.drop(1)} <br><br>""" +
+              s"""You have ONE vote on Topic("$topic") <br>""" +
               votingForm(vote) + "<br>"  +
-              showCounts(topic) + "<br> <br> <br>" +
-              showDatabase
+              showCounts(topic) + "<br> <br> <br>"
+              //+ showDatabase
             )
             result
 
@@ -163,31 +179,6 @@ object Muddy {
 
       case _ => " "
     }
-
-    // parts match {
-    //   case Seq(_, "muddy", topic, info) if info.startsWith("session=") =>
-    //     val id = info.stripPrefix("session=").takeWhile(_ != '?')
-    //     val vote = Url.decode(
-    //       info.dropWhile(_ != '?')
-    //         .stripPrefix("?")
-    //         .stripPrefix("mud=")
-    //         .trim
-    //         .toLowerCase
-    //     )
-    //     log(s"\n*** setVote($id,$topic,$vote)\n")
-    //     setVote(id = id, topic = topic, value = vote)
-    //     val result = Html.page(
-    //       "Your ip address: " + inetAdress + "<br>" +
-    //       votingForm(vote) + "<br>"  +
-    //       showCounts(topic) + "<br> <br> <br>" +
-    //       showDatabase
-    //     )
-    //     result
-    //
-    //   case Seq(_, "muddy", topic) => loginPage(sessionId = nextId(), topic)
-    //
-    //   case _ => Html.errorResponse(uriOpt.getOrElse(""), "sidan är vojd :( ")
-    // }
   }
 
   var n = 0
