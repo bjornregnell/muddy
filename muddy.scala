@@ -124,8 +124,8 @@ object Muddy {
       .collect { case (v, xs) => (v, xs.size) }.toSeq
       .sortBy(_._2).reverse
     val n = register.map(_._2).sum
-    val max = register.maxBy(_._2)._2
-    val winners = register.filter(_._2 == max).map(_._1).mkString(", ")
+    val max = Try(register.maxBy(_._2)._2).getOrElse(0)
+    val winners = Try(register.filter(_._2 == max).map(_._1).mkString(", ")).getOrElse("")
     s"TOT=$n. MAX=$max: $winners.<br>" +
       register.map { case (v, n) => s"$v($n)" }.mkString(", ")
   }
