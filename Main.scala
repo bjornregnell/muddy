@@ -5,6 +5,7 @@ object Main {
 	|  Commands:
 	|    stop       stop server, exit
 	|    show       show database
+  |    log        toggle log on/off
 	|    help | ?   show this message
 	""".stripMargin
 
@@ -18,10 +19,11 @@ object Main {
     while (!quit) {
 			val reply = getCmd() match {
 				case "stop"       => quit = true; "Goodbye Almighty User!"
-				case "show"       => Muddy.showDatabase
-				case "help" | "?" => helpMsg
-				case ""           => ""
-				case unkown       => s"Unknown command: $unkown\n$helpMsg"
+        case "log"        => Muddy.toggleLogging
+        case "show"       => Muddy.showDatabase
+        case "help" | "?" => helpMsg
+        case ""           => ""
+        case unkown       => s"Unknown command: $unkown\n$helpMsg"
 			}
 			println(reply)
 		}

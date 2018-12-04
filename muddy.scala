@@ -72,7 +72,15 @@ object Concurrently {
 object Muddy {
   var version = "0.0.4"
 
-  def log(msg: String): Unit = println(msg)
+  var isLogging = false
+
+  def toggleLogging: String = {
+    isLogging = !isLogging
+    s"isLogging == $isLogging"
+  }
+
+  def log(msg: String, level: Int = 0): Unit = if (isLogging) println(msg)
+  def err(msg: String): Unit = println(msg)
 
   def loginForm(topic: String, id: String): String = s"""
   <form action="/muddy/$topic/session=$id" method="get">
@@ -145,7 +153,6 @@ object Muddy {
 
       case (Success("GET"), Success(s)) if s.startsWith("/muddy") =>
         val parts = s.stripPrefix("/muddy").split('/').toSeq.filter(_.nonEmpty)
-        println(s"MUDDY: $parts")
         val page = parts match {
           case Seq(topic, info) if info.startsWith("session=") =>
             val id = info.stripPrefix("session=").takeWhile(_ != '?')
@@ -185,22 +192,17 @@ object Muddy {
 
   def handleRequest(clientSocket: Socket): Unit = {
     n += 1
-    println(s"${n}th $clientSocket")
+    log(s"${n}th $clientSocket")
     var os: OutputStream = null
     try {
       val is = clientSocket.getInputStream
-      log("waiting for data on input stream")
+      //log("waiting for data on input stream")
       val scan = new Scanner(is, "UTF-8")
       val cmd = Try(scan.next)
       val url = Try(scan.next)
-      log(s"""
-        |---INPUT BEGIN:
-        | cmd = $cmd
-        | url = $url
-        |---INPUT END.
-      """.stripMargin)
+      log(s"cmd = $cmd url = $url")
       val output: String = response(cmd, url, clientSocket.getInetAddress.toString)
-  		log(s"SENDING RESPONSE:\n$output")
+  		//log(s"SENDING RESPONSE:\n$output")
       os = clientSocket.getOutputStream
       os.write(output.getBytes("UTF-8"))
     // } catch { case e: Throwable =>
@@ -231,7 +233,7 @@ object Muddy {
           log(s"\n___Request complete.\n")
         }
   	  } catch { case e: Throwable =>
-          log(s"*********** ERROR: Connection failed due to exception: $e")
+          err(s"*********** ERROR: Connection failed due to exception: $e")
       }
 		}
   }
