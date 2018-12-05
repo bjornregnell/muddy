@@ -14,8 +14,8 @@ object Html {
 
   def favicon = """<link href="data:$faviconMini" rel="icon" type="image/x-icon" />"""
 
-	def page(body: String): String =  {
-		//minimal web page, the link tag prevents GET /favicon.ico
+  def page(body: String): String =  {
+    //minimal web page, the link tag prevents GET /favicon.ico
     s"""<!DOCTYPE html>
        |<html><head><meta charset="UTF-8"><title>MUDDY VOTING SÖRVER</title>
        |$favicon
@@ -43,16 +43,16 @@ object Html {
        |      margin: 1px 1px;
        |}
        |</style>
-			 |</head>
+       |</head>
        |<body>
        |$body
        |</body>
        |</html>
        """.stripMargin
-	}
+  }
 
-	def header(length: Int): String = //standardized header of reply to client
-	  s"HTTP/1.0 200 OK\nContent-length: $length\nContent-type: text/html\n\n"
+  def header(length: Int): String = //standardized header of reply to client
+    s"HTTP/1.0 200 OK\nContent-length: $length\nContent-type: text/html\n\n"
 
   def errorResponse(uri:String, msg: String) =
     Html.page(s"FATTAR NOLL: $uri <br> $msg")
@@ -202,7 +202,7 @@ object Muddy {
       val url = Try(scan.next)
       log(s"cmd = $cmd url = $url")
       val output: String = response(cmd, url, clientSocket.getInetAddress.toString)
-  		//log(s"SENDING RESPONSE:\n$output")
+      //log(s"SENDING RESPONSE:\n$output")
       os = clientSocket.getOutputStream
       os.write(output.getBytes("UTF-8"))
     // } catch { case e: Throwable =>
@@ -217,9 +217,9 @@ object Muddy {
     log(s"\nStarting Muddy server version $version on port $port...")
     val serverSocket = new ServerSocket(port)
     log(s"Server running at: http://localhost:${serverSocket.getLocalPort}")
-		while (true) {
+    while (true) {
       var clientSocket: Socket = null
-  		try {
+      try {
         log("*** Waiting for connection...")
         clientSocket = serverSocket.accept  // blocks this thread until connect
         log(s"""
@@ -228,14 +228,14 @@ object Muddy {
           |  PORT: ${clientSocket.getPort()}
         """.stripMargin)
 
-		    Concurrently {
+        Concurrently {
           handleRequest(clientSocket)
           log(s"\n___Request complete.\n")
         }
-  	  } catch { case e: Throwable =>
+      } catch { case e: Throwable =>
           err(s"*********** ERROR: Connection failed due to exception: $e")
       }
-		}
+    }
   }
 
 }
