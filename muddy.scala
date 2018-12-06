@@ -1,9 +1,6 @@
 package muddy
 
 import tinyserver._
-import java.net.{ServerSocket, Socket}
-import java.io.OutputStream
-import java.util.Scanner
 import scala.util.{Try, Success, Failure}
 
 object Muddy extends TinyWebServer {
@@ -26,7 +23,7 @@ object Muddy extends TinyWebServer {
     Html.page(s"""
       Welcome to Muddy v$version! <br><br>
       Your ip: $ip<br><br>
-      Press Login to start voting on "$topic".<br><br>
+      Press Login to start voting on<br>"$topic".<br><br>
       ${loginForm(topic, sessionId)}
     """)
 
@@ -65,7 +62,7 @@ object Muddy extends TinyWebServer {
 
   def nextId(): String = java.util.UUID.randomUUID.toString
 
-  def response(cmd: Try[String], url: Try[String], inetAdress: String): String = {
+  def response(cmd: Try[String], url: Try[String], ipAdr: String): String = {
     (cmd, url) match {
       case (Success("GET"), Success("/favicon.ico")) =>
         Html.faviconMini
@@ -90,14 +87,14 @@ object Muddy extends TinyWebServer {
             log(s"\n*** setVote($id,$topic,$vote)\n")
             setVote(id = id, topic = topic, value = vote)
             val result = Html.page(
-              s"""Vote on Topic("$topic")""" +
+              s"""Vote on "$topic"!""" +
               votingForm(vote) + "<br>"  +
               showCounts(topic) + "<br> <br> <br>" +
-              s"""Muddy v$version from $inetAdress<br>"""
+              s"""Muddy v$version from $ipAdr<br>"""
             )
             result
 
-          case Seq(topic) => loginPage(sessionId = nextId(), topic, inetAdress)
+          case Seq(topic) => loginPage(sessionId = nextId(), topic, ipAdr)
           case _ => Html.page(s"MUDDY: $parts")
         }
         Html.header(page.size) + page
