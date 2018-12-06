@@ -4,8 +4,6 @@ import java.net.{ServerSocket, Socket}
 import java.io.OutputStream
 import java.util.Scanner
 import scala.util.{Try, Success, Failure}
-// import scala.concurrent._
-// import ExecutionContext.Implicits.global
 
 object Html {
   def faviconData = """image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACBAAAeaR9cIAAAAASUVORK5CYII="""
@@ -63,15 +61,33 @@ object Url {
   def decode(url: String): String = java.net.URLDecoder.decode(url, "UTF-8")
 }
 
-object Concurrently {
-  def apply(code: => Unit): Unit = new Thread{
-    override def run(): Unit = code
-  }.start
+class KeyValueDatabase[K, V] {
+  private val store = new java.util.concurrent.ConcurrentHashMap[K,V]
+
+  def put(k: K, v: V): Unit = store.put(k, v)
+
+  def get(k: K): Option[V] = scala.util.Try{store.get(k)}.toOption
+
+  def toMap: Map[K, V] = {
+    import scala.collection.JavaConverters._
+    store.asScala.toMap
+  }
+
+  override def toString: String = toMap.toString
 }
 
-object Muddy {
-  var version = "0.0.4"
+object Concurrently {
+  var isUseBareThreads = false
+  def apply(code: => Unit): Unit =
+    if (isUseBareThreads) new Thread { override def run(): Unit = code }.start
+    else {
+      import scala.concurrent._
+      import ExecutionContext.Implicits.global
+      Future { code }
+    }
+}
 
+trait TinyWebServer {
   var isLogging = false
 
   def toggleLogging: String = {
@@ -80,7 +96,19 @@ object Muddy {
   }
 
   def log(msg: String, level: Int = 0): Unit = if (isLogging) println(msg)
-  def err(msg: String): Unit = println(msg)
+
+  def err(msg: String): Unit = println(s"*********** ERROR: $msg")
+
+}
+
+object Muddy extends TinyWebServer {
+  val version = "0.0.5"
+
+  case class Key(id: String, topic: String)
+  case class Value(value: String)
+
+  val db = new KeyValueDatabase[Key, Value]
+
 
   def loginForm(topic: String, id: String): String = s"""
   <form action="/muddy/$topic/session=$id" method="get">
@@ -110,11 +138,6 @@ object Muddy {
   </form>
   """
 
-  case class Key(id: String, topic: String)
-  case class Value(value: String)
-
-  import scala.collection.JavaConverters._
-  val db = new java.util.concurrent.ConcurrentHashMap[Key,Value]
 
   //TODO: def database: Map[Key, Value] = db.toArray.toMap ???
   //TODO: check that session is existing
@@ -123,10 +146,10 @@ object Muddy {
     db.put(Key(id, topic), Value(value))
 
   def getVote(id: String, topic: String): String =
-    Option(db.get(Key(id, topic))).map(_.value).getOrElse("")
+    db.get(Key(id, topic)).map(_.value).getOrElse("")
 
   def showCounts(topic: String): String = {
-    val register = db.asScala.filterKeys(_.topic == topic)
+    val register = db.toMap.filterKeys(_.topic == topic)
       .values.collect { case Value(s) if s.nonEmpty => s }
       .groupBy(x => x)
       .collect { case (v, xs) => (v, xs.size) }.toSeq
@@ -196,17 +219,15 @@ object Muddy {
     var os: OutputStream = null
     try {
       val is = clientSocket.getInputStream
-      //log("waiting for data on input stream")
+      log("waiting for data on input stream")
       val scan = new Scanner(is, "UTF-8")
       val cmd = Try(scan.next)
       val url = Try(scan.next)
       log(s"cmd = $cmd url = $url")
       val output: String = response(cmd, url, clientSocket.getInetAddress.toString)
-      //log(s"SENDING RESPONSE:\n$output")
+      log(s"SENDING RESPONSE:\n$output")
       os = clientSocket.getOutputStream
       os.write(output.getBytes("UTF-8"))
-    // } catch { case e: Throwable =>
-    //     log(s"ERROR: handleRequest failed due to exception: $e")
     } finally {
       if (os != null) os.close
       if (clientSocket != null) clientSocket.close
@@ -222,18 +243,18 @@ object Muddy {
       try {
         log("*** Waiting for connection...")
         clientSocket = serverSocket.accept  // blocks this thread until connect
-        log(s"""
+        log(s"""${"-" * 20}
           |REQUEST:
           |  FROM: ${clientSocket.getInetAddress()}
           |  PORT: ${clientSocket.getPort()}
-        """.stripMargin)
+          |""".stripMargin)
 
         Concurrently {
           handleRequest(clientSocket)
-          log(s"\n___Request complete.\n")
+          log(s"\nRequest complete.\n${"=" * 20}")
         }
       } catch { case e: Throwable =>
-          err(s"*********** ERROR: Connection failed due to exception: $e")
+          err(s"Connection failed due to exception: $e")
       }
     }
   }
