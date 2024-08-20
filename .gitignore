@@ -7,3 +7,10 @@
 
 # Sbt
 **/target
+
+.bsp
+.metals
+.vscode
+.bloop
+**/metals.sbt
+
