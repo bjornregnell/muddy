@@ -1,4 +1,4 @@
-           scalaVersion := "2.12.7"
+           scalaVersion := "2.12.19"
           scalacOptions := Seq("-unchecked", "-deprecation")
                    fork := true // https://stackoverflow.com/questions/18676712
            connectInput := true // http://www.scala-sbt.org/1.x/docs/Forking.html
